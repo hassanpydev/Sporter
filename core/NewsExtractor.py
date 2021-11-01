@@ -53,17 +53,19 @@ class ABC_NEWS(metaclass=ABCMeta):
 
 class SkySportNewsExtractor(ABC_NEWS, ABC):
     def __init__(self, source_page, css_selector) -> None:
+        print("Initializing SkySportNewsExtractor")
+        self.source_page = source_page
         self.soup = BeautifulSoup(source_page, "html.parser")
         self.css_selector = css_selector
 
     def getNewsAsJson(self) -> list:
-        print(self.css_selector)
+        
         titles = self.soup.select(self.css_selector)
-        print(titles)
         news_container = []
         if all([len(titles) > 0, titles]):
             for news in titles:
-                news_container.append(dict(title=news.text, link=news["href"]))
+                print(news.text.strip(),'\n',news["href"])
+                news_container.append(dict(title=news.text.strip(), link=news["href"]))
             pass
         else:
             print("No data was found")
@@ -72,6 +74,8 @@ class SkySportNewsExtractor(ABC_NEWS, ABC):
 
 class FirstPostNewsExtractors(ABC_NEWS, ABC):
     def __init__(self, source_page, css_selector) -> None:
+        print("Initializing FirstPostNewsExtractors")
+        
         self.soup = BeautifulSoup(source_page, "html.parser")
         self.css_selector = css_selector
 
@@ -102,10 +106,10 @@ class NewsResources:
             return False
 
     def SkySport(self):
-        """Scrap news from https://www.skysports.com/news-wire"""
+        """Scrap news from https://www.skysports.com/football/news"""
 
-        html_response = self.GetWebPageSource(url="https://www.skysports.com/news-wire")
-        trend_selector = ".most-popular__story"
+        html_response = self.GetWebPageSource(url="https://www.skysports.com/football/news")
+        trend_selector = ".news-list__headline-link"
         if html_response:
             sky_news = SkySportNewsExtractor(
                 source_page=html_response, css_selector=trend_selector
