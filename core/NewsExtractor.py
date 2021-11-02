@@ -3,12 +3,12 @@ from abc import ABCMeta, abstractmethod, ABC
 import requests
 from bs4 import BeautifulSoup
 from requests import get
-from WP_Poster import CreatePost
+from .WP_Poster import CreatePost
 import threading, queue
 import json
 
 
-def getContent(url):
+def __getContent(url):
     response = get(url)
     if response.status_code == 200:
         content_soup = BeautifulSoup(response.text, "html.parser")
@@ -41,7 +41,7 @@ def getNews():
             # print(i.text)
             # print(i['href'])
             titles_queue.put(i["href"], timeout=3)
-            thread = threading.Thread(target=getContent, args=(titles_queue.get(),))
+            thread = threading.Thread(target=__getContent, args=(titles_queue.get(),))
             thread.start()
 
 
@@ -52,20 +52,40 @@ class ABC_NEWS(metaclass=ABCMeta):
 
 
 class SkySportNewsExtractor(ABC_NEWS, ABC):
-    def __init__(self, source_page, css_selector) -> None:
+    def __init__(self, source_page, css_selector, callback) -> None:
         print("Initializing SkySportNewsExtractor")
         self.source_page = source_page
         self.soup = BeautifulSoup(source_page, "html.parser")
         self.css_selector = css_selector
+        self.callback = callback
+
+    def contentExtractor(self, url):
+        #TODO add all p togather and add a breakline
+        css_selector = "div > div p"
+        html_content = self.callback(url)
+        content_soup = BeautifulSoup(html_content, "html.parser")
+        return content_soup.select_one(css_selector)
 
     def getNewsAsJson(self) -> list:
-        
+
         titles = self.soup.select(self.css_selector)
         news_container = []
         if all([len(titles) > 0, titles]):
             for news in titles:
-                print(news.text.strip(),'\n',news["href"])
-                news_container.append(dict(title=news.text.strip(), link=news["href"]))
+                try:
+                    print(news.text.strip(), "\n", news["href"])
+                    content = self.contentExtractor(news["href"])
+                    news_container.append(
+                        dict(
+                            title=news.text.strip(),
+                            link=news["href"],
+                            content_string=content.text,
+                            content_obj=content,
+                        )
+                    )
+                except Exception as e:
+                    print(e)
+                    pass
             pass
         else:
             print("No data was found")
@@ -75,7 +95,7 @@ class SkySportNewsExtractor(ABC_NEWS, ABC):
 class FirstPostNewsExtractors(ABC_NEWS, ABC):
     def __init__(self, source_page, css_selector) -> None:
         print("Initializing FirstPostNewsExtractors")
-        
+
         self.soup = BeautifulSoup(source_page, "html.parser")
         self.css_selector = css_selector
 
@@ -108,11 +128,15 @@ class NewsResources:
     def SkySport(self):
         """Scrap news from https://www.skysports.com/football/news"""
 
-        html_response = self.GetWebPageSource(url="https://www.skysports.com/football/news")
+        html_response = self.GetWebPageSource(
+            url="https://www.skysports.com/football/news"
+        )
         trend_selector = ".news-list__headline-link"
         if html_response:
             sky_news = SkySportNewsExtractor(
-                source_page=html_response, css_selector=trend_selector
+                source_page=html_response,
+                css_selector=trend_selector,
+                callback=self.GetWebPageSource,
             )
             return sky_news.getNewsAsJson()
         else:
